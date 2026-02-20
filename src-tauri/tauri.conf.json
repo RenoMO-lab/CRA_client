@@ -21,7 +21,7 @@
     "bundle": {
       "active": true,
       "targets": ["nsis"],
-      "identifier": "com.renomo.cra_client",
+      "identifier": "com.renomo.cra.client",
       "category": "Business",
       "shortDescription": "CRA Desktop client wrapper",
       "icon": ["icons/icon.ico"]
