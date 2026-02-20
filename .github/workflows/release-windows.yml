@@ -58,6 +58,7 @@ jobs:
           .\scripts\package-windows.ps1 -Version $version
 
       - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
