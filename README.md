@@ -1,4 +1,4 @@
-﻿# CRA Client (Tauri Desktop Wrapper)
+# CRA Client (Tauri Desktop Wrapper)
 
 Windows desktop wrapper for the CRA web application. The desktop app does not host business logic or data. It loads the existing remote app URL and keeps computation/database activity on the server.
 

@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "cra_client"
 version = "0.1.0"
 description = "CRA desktop client wrapper"
