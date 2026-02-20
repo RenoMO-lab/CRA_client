@@ -30,6 +30,18 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Normalize package.json encoding
+        shell: pwsh
+        run: |
+          $path = "package.json"
+          $bytes = [System.IO.File]::ReadAllBytes($path)
+          if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+            Write-Host "Detected UTF-8 BOM in package.json; rewriting as UTF-8 without BOM."
+            $content = [System.Text.Encoding]::UTF8.GetString($bytes, 3, $bytes.Length - 3)
+            $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+            [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+          }
+
       - name: Install dependencies
         run: npm install
 

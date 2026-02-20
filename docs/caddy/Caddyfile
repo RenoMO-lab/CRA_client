@@ -1,0 +1,13 @@
+{
+  # Optional contact email for ACME if external certs are used later.
+  email admin@localhost
+}
+
+# Release HTTPS endpoint for CRA Client.
+# Copy this file to: C:\ProgramData\Caddy\Caddyfile
+https://192.168.50.55 {
+  # Internal CA for private network deployments.
+  tls internal
+
+  reverse_proxy 127.0.0.1:3000
+}

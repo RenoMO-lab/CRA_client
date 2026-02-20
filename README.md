@@ -1,12 +1,13 @@
 # CRA Client (Tauri Desktop Wrapper)
 
-Windows desktop wrapper for the CRA web application. The desktop app does not host business logic or data. It loads the existing remote app URL and keeps computation/database activity on the server.
+Windows desktop wrapper for the CRA web application. The desktop app does not host business logic or data. It loads the remote app URL and keeps computation/database activity on the server.
 
-## What this repo changes
+## Primary target host
 
-- Adds a Windows `.exe` desktop channel for internal users.
-- Keeps the browser-based app available in parallel.
-- Does not require changes in `CRA_Local_W2016_Server` for the wrapper itself.
+Primary web app target is:
+- `192.168.50.55:3000` (HTTP for dev/integration)
+
+Localhost is test-only and not part of the normal allowlist.
 
 ## Runtime configuration
 
@@ -19,47 +20,71 @@ Resolution order:
 4. `%APPDATA%\CRA Client\client.env`.
 
 Required keys:
-- `APP_URL`: Full HTTPS URL of the existing web app.
-- `ALLOWED_HOSTS`: Comma-separated host allowlist used by navigation guard. Must include `APP_URL` host.
+- `APP_URL`: Target URL of the existing web app.
+- `ALLOWED_HOSTS`: Comma-separated host allowlist used by navigation guard. Must include the `APP_URL` host.
 
 Optional keys:
 - `WINDOW_TITLE` (default `CRA Client`)
 - `WINDOW_WIDTH` (default `1280`)
 - `WINDOW_HEIGHT` (default `800`)
 
-Example `client.env`:
+Development `client.env` (current deployment):
 
 ```env
-APP_URL=https://your-production-app.example.com
-ALLOWED_HOSTS=your-production-app.example.com
+APP_URL=http://192.168.50.55:3000
+ALLOWED_HOSTS=192.168.50.55
 WINDOW_TITLE=CRA Client
 WINDOW_WIDTH=1280
 WINDOW_HEIGHT=800
 ```
 
+Release `client.env`:
+
+```env
+APP_URL=https://192.168.50.55
+ALLOWED_HOSTS=192.168.50.55
+WINDOW_TITLE=CRA Client
+WINDOW_WIDTH=1280
+WINDOW_HEIGHT=800
+```
+
+Note: In release builds, `APP_URL` must be HTTPS.
+
 ## Development
 
 Prerequisites:
 - Node.js 20+
-- Rust toolchain (stable)
+- Rust toolchain (stable) with `cargo`/`rustc` on PATH
 - Windows build tools for Tauri
 
 Install and run:
 
 ```powershell
-npm install
-npm run tauri:dev
+npm.cmd install
+npm.cmd run tauri:dev
 ```
+
+`npm.cmd` is recommended in this environment because PowerShell may block `npm.ps1` by execution policy.
 
 ## Build
 
 ```powershell
-npm install
-npm run tauri:build
+npm.cmd install
+npm.cmd run tauri:build
 ```
 
 NSIS output is generated under:
 - `src-tauri/target/release/bundle/nsis/`
+
+## HTTPS endpoint for release (Caddy)
+
+Use Caddy on the server host to terminate TLS and reverse proxy to the Node app on port `3000`.
+
+1. Install Caddy service on the server (`192.168.50.55`).
+2. Place config at `C:\ProgramData\Caddy\Caddyfile`.
+3. Use the sample file in this repo: `docs/caddy/Caddyfile`.
+4. Trust Caddy's root CA on all client machines.
+5. Switch `APP_URL` to `https://192.168.50.55` for release packaging.
 
 ## Deterministic pilot artifact name
 
@@ -97,10 +122,13 @@ Tag-based GitHub Actions workflow:
   - `CRA-Client-<version>-windows-x64.exe`
   - `CRA-Client-<version>-windows-x64.exe.sha256`
 
-## Test checklist
+## Troubleshooting
 
-- Missing `APP_URL` or `ALLOWED_HOSTS` shows config error screen.
-- Unreachable server shows retry flow.
-- Reachable server opens remote app without restart.
-- Non-allowlisted navigation opens in default browser.
-- Desktop and web browser access work concurrently against same backend.
+- `failed to get cargo metadata: program not found`
+  - Install Rust and ensure `%USERPROFILE%\.cargo\bin` is on PATH.
+- `npm.ps1 cannot be loaded because running scripts is disabled`
+  - Use `npm.cmd` instead of `npm` in PowerShell.
+- `Failed to load PostCSS config ... Unexpected token ... "name"... is not valid JSON`
+  - Ensure `package.json` is UTF-8 without BOM. The release workflow includes a normalization step.
+- `Could not reach server at http://192.168.50.55:3000`
+  - Verify network path/firewall and that the server process is listening on port `3000`.

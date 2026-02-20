@@ -103,11 +103,11 @@ struct AboutInfo {
 }
 
 #[tauri::command]
-async fn bootstrap_state(state: State<'_, AppState>) -> BootstrapState {
+async fn bootstrap_state(state: State<'_, AppState>) -> Result<BootstrapState, String> {
   let version = env!("CARGO_PKG_VERSION").to_string();
 
   if let Some(config_error) = &state.config_error {
-    return BootstrapState {
+    return Ok(BootstrapState {
       ready: false,
       config_error: Some(config_error.clone()),
       app_url: None,
@@ -118,11 +118,11 @@ async fn bootstrap_state(state: State<'_, AppState>) -> BootstrapState {
       version,
       reachable: false,
       reachability_error: None,
-    };
+    });
   }
 
   let Some(config) = &state.config else {
-    return BootstrapState {
+    return Ok(BootstrapState {
       ready: false,
       config_error: Some("Runtime configuration is missing.".to_string()),
       app_url: None,
@@ -133,12 +133,12 @@ async fn bootstrap_state(state: State<'_, AppState>) -> BootstrapState {
       version,
       reachable: false,
       reachability_error: None,
-    };
+    });
   };
 
   let reachability = check_server_reachable(&config.app_url).await;
 
-  BootstrapState {
+  Ok(BootstrapState {
     ready: true,
     config_error: None,
     app_url: Some(config.app_url.to_string()),
@@ -149,15 +149,21 @@ async fn bootstrap_state(state: State<'_, AppState>) -> BootstrapState {
     version,
     reachable: reachability.is_ok(),
     reachability_error: reachability.err(),
-  }
+  })
 }
 
 #[tauri::command]
 async fn launch_app(window: Window, state: State<'_, AppState>) -> Result<(), String> {
   let config = get_config(&state)?;
   check_server_reachable(&config.app_url).await?;
+  let target = config
+    .app_url
+    .to_string()
+    .replace('\\', "\\\\")
+    .replace('"', "\\\"");
+
   window
-    .navigate(config.app_url.clone())
+    .eval(&format!("window.location.replace(\"{}\");", target))
     .map_err(|error| format!("Failed to navigate to APP_URL: {error}"))
 }
 
@@ -418,7 +424,7 @@ fn main() {
         .resizable(true)
         .initialization_script(INIT_SCRIPT)
         .on_navigation(move |url| {
-          if is_allowed_navigation(url, &allowed_hosts) {
+          if is_allowed_navigation(&url, &allowed_hosts) {
             return true;
           }
 
