@@ -1,0 +1,54 @@
+﻿name: release-windows
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build desktop app
+        run: npm run tauri:build
+
+      - name: Repackage deterministic artifact
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ($version.StartsWith("v")) {
+            $version = $version.Substring(1)
+          }
+          .\scripts\package-windows.ps1 -Version $version
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/CRA-Client-*-windows-x64.exe
+            artifacts/CRA-Client-*-windows-x64.exe.sha256

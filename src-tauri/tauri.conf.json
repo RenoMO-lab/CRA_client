@@ -1,0 +1,31 @@
+﻿{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "package": {
+    "productName": "CRA Client",
+    "version": "0.1.0"
+  },
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": ["nsis"],
+      "identifier": "com.renomo.cra_client",
+      "category": "Business",
+      "shortDescription": "CRA Desktop client wrapper",
+      "icon": ["icons/icon.ico"]
+    },
+    "windows": []
+  }
+}

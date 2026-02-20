@@ -1,0 +1,8 @@
+﻿node_modules/
+dist/
+.vscode/
+.DS_Store
+*.log
+src-tauri/target/
+artifacts/
+client.env
