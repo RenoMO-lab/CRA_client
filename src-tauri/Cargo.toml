@@ -1,6 +1,6 @@
 [package]
 name = "cra_client"
-version = "0.1.8"
+version = "0.1.9"
 description = "CRA desktop client wrapper"
 authors = ["RenoMO-lab"]
 edition = "2021"

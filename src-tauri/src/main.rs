@@ -502,8 +502,9 @@ fn main() {
         .as_ref()
         .map(|value| value.allowed_hosts.clone())
         .unwrap_or_default();
+      let default_icon = app.default_window_icon().cloned();
 
-      tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
+      let mut window_builder = tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
         .title(window_title)
         .inner_size(window_width, window_height)
         .resizable(true)
@@ -514,7 +515,13 @@ fn main() {
           }
 
           false
-        })
+        });
+
+      if let Some(icon) = default_icon {
+        window_builder = window_builder.icon(icon);
+      }
+
+      window_builder
         .build()
         .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
 

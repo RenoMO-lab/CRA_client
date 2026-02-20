@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
     "productName": "CRA Client",
-    "version": "0.1.8"
+    "version": "0.1.9"
   },
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -20,7 +20,12 @@
       "identifier": "com.renomo.cra.client",
       "category": "Business",
       "shortDescription": "CRA Desktop client wrapper",
-      "icon": ["icons/icon.ico"]
+      "icon": ["icons/icon.ico"],
+      "windows": {
+        "nsis": {
+          "installerIcon": "icons/icon.ico"
+        }
+      }
     },
     "windows": []
   }
