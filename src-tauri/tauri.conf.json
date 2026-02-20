@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
     "productName": "CRA Client",
-    "version": "0.1.0"
+    "version": "0.1.6"
   },
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,11 +12,7 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      }
+      "all": false
     },
     "bundle": {
       "active": true,

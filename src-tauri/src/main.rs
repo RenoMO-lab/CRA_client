@@ -11,6 +11,8 @@ use url::Url;
 const DEFAULT_TITLE: &str = "CRA Client";
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 800.0;
+const DEFAULT_APP_URL: &str = "https://192.168.50.55";
+const DEFAULT_ALLOWED_HOSTS: &str = "192.168.50.55";
 
 const INIT_SCRIPT: &str = r#"
 (() => {
@@ -27,7 +29,7 @@ const INIT_SCRIPT: &str = r#"
 
   window.open = (url) => {
     if (typeof url === 'string' && url.length > 0) {
-      void invoke('open_external', { url });
+      window.location.assign(url);
     }
     return null;
   };
@@ -49,7 +51,7 @@ const INIT_SCRIPT: &str = r#"
       }
       if (link.target === '_blank') {
         event.preventDefault();
-        void invoke('open_external', { url: href });
+        window.location.assign(href);
       }
     },
     true,
@@ -195,12 +197,6 @@ fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
   }
 }
 
-#[tauri::command]
-fn open_external(url: String, app: tauri::AppHandle) -> Result<(), String> {
-  tauri::api::shell::open(&app.shell_scope(), url, None)
-    .map_err(|error| format!("Failed to open URL in default browser: {error}"))
-}
-
 fn get_config(state: &AppState) -> Result<RuntimeConfig, String> {
   state
     .config
@@ -282,11 +278,62 @@ fn candidate_client_env_files() -> Vec<PathBuf> {
     }
   }
 
-  if let Ok(app_data) = std::env::var("APPDATA") {
-    files.push(PathBuf::from(app_data).join("CRA Client").join("client.env"));
+  if let Some(path) = appdata_client_env_path() {
+    files.push(path);
   }
 
   files
+}
+
+fn appdata_client_env_path() -> Option<PathBuf> {
+  std::env::var("APPDATA")
+    .ok()
+    .map(|app_data| PathBuf::from(app_data).join("CRA Client").join("client.env"))
+}
+
+fn default_client_env_contents() -> String {
+  format!(
+    "# Auto-generated default configuration for CRA Client.\n\
+# Update APP_URL and ALLOWED_HOSTS if your deployment target changes.\n\
+APP_URL={}\n\
+ALLOWED_HOSTS={}\n\
+WINDOW_TITLE={}\n\
+WINDOW_WIDTH={}\n\
+WINDOW_HEIGHT={}\n",
+    DEFAULT_APP_URL,
+    DEFAULT_ALLOWED_HOSTS,
+    DEFAULT_TITLE,
+    DEFAULT_WIDTH as i64,
+    DEFAULT_HEIGHT as i64
+  )
+}
+
+fn ensure_default_client_env_file() -> Result<(), String> {
+  let Some(path) = appdata_client_env_path() else {
+    return Ok(());
+  };
+
+  if path.exists() {
+    return Ok(());
+  }
+
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent).map_err(|error| {
+      format!(
+        "Could not create config directory '{}': {error}",
+        parent.display()
+      )
+    })?;
+  }
+
+  fs::write(&path, default_client_env_contents()).map_err(|error| {
+    format!(
+      "Could not create default config file '{}': {error}",
+      path.display()
+    )
+  })?;
+
+  Ok(())
 }
 
 fn parse_client_env_file(content: &str, output: &mut HashMap<String, String>) {
@@ -326,6 +373,7 @@ fn load_client_env_values() -> HashMap<String, String> {
 }
 
 fn load_runtime_config() -> Result<RuntimeConfig, String> {
+  ensure_default_client_env_file()?;
   let file_values = load_client_env_values();
 
   let app_url_raw = read_required_value("APP_URL", &file_values)?;
@@ -369,13 +417,17 @@ fn load_runtime_config() -> Result<RuntimeConfig, String> {
   })
 }
 
+fn is_internal_navigation_host(host: &str) -> bool {
+  matches!(host, "tauri.localhost" | "localhost" | "127.0.0.1" | "::1")
+}
+
 fn is_allowed_navigation(url: &Url, allowed_hosts: &HashSet<String>) -> bool {
   match url.scheme() {
     "tauri" | "asset" | "about" | "data" | "blob" => true,
     "http" | "https" => url
       .host_str()
       .map(normalize_host)
-      .map(|host| allowed_hosts.contains(&host))
+      .map(|host| is_internal_navigation_host(&host) || allowed_hosts.contains(&host))
       .unwrap_or(false),
     _ => false,
   }
@@ -416,8 +468,6 @@ fn main() {
         .map(|value| value.allowed_hosts.clone())
         .unwrap_or_default();
 
-      let app_handle = app.handle();
-
       tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
         .title(window_title)
         .inner_size(window_width, window_height)
@@ -428,7 +478,6 @@ fn main() {
             return true;
           }
 
-          let _ = tauri::api::shell::open(&app_handle.shell_scope(), url.to_string(), None);
           false
         })
         .build()
@@ -440,7 +489,6 @@ fn main() {
       bootstrap_state,
       launch_app,
       retry_connect,
-      open_external,
       get_about_info
     ])
     .run(tauri::generate_context!())
