@@ -502,7 +502,7 @@ fn main() {
         .as_ref()
         .map(|value| value.allowed_hosts.clone())
         .unwrap_or_default();
-      let default_icon = app.default_window_icon().cloned();
+      let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.ico").to_vec());
 
       let mut window_builder = tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
         .title(window_title)
@@ -517,11 +517,9 @@ fn main() {
           false
         });
 
-      if let Some(icon) = default_icon {
-        window_builder = window_builder
-          .icon(icon)
-          .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
-      }
+      window_builder = window_builder
+        .icon(app_icon)
+        .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
 
       window_builder
         .build()
