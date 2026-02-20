@@ -518,7 +518,9 @@ fn main() {
         });
 
       if let Some(icon) = default_icon {
-        window_builder = window_builder.icon(icon);
+        window_builder = window_builder
+          .icon(icon)
+          .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
       }
 
       window_builder
