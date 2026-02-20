@@ -502,7 +502,7 @@ fn main() {
         .as_ref()
         .map(|value| value.allowed_hosts.clone())
         .unwrap_or_default();
-      let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.ico").to_vec());
+      let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.png").to_vec());
 
       let mut window_builder = tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
         .title(window_title)

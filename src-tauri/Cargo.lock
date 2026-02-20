@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "cra_client"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "reqwest",
  "serde",
@@ -3089,6 +3089,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "plist",
+ "png",
  "rand 0.8.5",
  "raw-window-handle",
  "semver",
