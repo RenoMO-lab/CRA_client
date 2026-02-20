@@ -11,7 +11,7 @@ use url::Url;
 const DEFAULT_TITLE: &str = "CRA Client";
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 800.0;
-const DEFAULT_APP_URL: &str = "https://192.168.50.55";
+const DEFAULT_APP_URL: &str = "http://192.168.50.55:3000";
 const DEFAULT_ALLOWED_HOSTS: &str = "192.168.50.55";
 
 const INIT_SCRIPT: &str = r#"
@@ -336,6 +336,40 @@ fn ensure_default_client_env_file() -> Result<(), String> {
   Ok(())
 }
 
+fn migrate_legacy_default_client_env_file() -> Result<(), String> {
+  let Some(path) = appdata_client_env_path() else {
+    return Ok(());
+  };
+
+  if !path.exists() {
+    return Ok(());
+  }
+
+  let content = match fs::read_to_string(&path) {
+    Ok(value) => value,
+    Err(_) => return Ok(()),
+  };
+
+  if !content.contains("# Auto-generated default configuration for CRA Client.") {
+    return Ok(());
+  }
+
+  let legacy = "APP_URL=https://192.168.50.55";
+  if !content.contains(legacy) {
+    return Ok(());
+  }
+
+  let updated = content.replace(legacy, "APP_URL=http://192.168.50.55:3000");
+  fs::write(&path, updated).map_err(|error| {
+    format!(
+      "Could not migrate legacy config file '{}': {error}",
+      path.display()
+    )
+  })?;
+
+  Ok(())
+}
+
 fn parse_client_env_file(content: &str, output: &mut HashMap<String, String>) {
   for line in content.lines() {
     let trimmed = line.trim();
@@ -373,6 +407,7 @@ fn load_client_env_values() -> HashMap<String, String> {
 }
 
 fn load_runtime_config() -> Result<RuntimeConfig, String> {
+  migrate_legacy_default_client_env_file()?;
   ensure_default_client_env_file()?;
   let file_values = load_client_env_values();
 
@@ -380,8 +415,8 @@ fn load_runtime_config() -> Result<RuntimeConfig, String> {
   let app_url = Url::parse(&app_url_raw)
     .map_err(|error| format!("APP_URL must be a valid URL: {error}"))?;
 
-  if !cfg!(debug_assertions) && app_url.scheme() != "https" {
-    return Err("APP_URL must use HTTPS in release builds.".to_string());
+  if app_url.scheme() != "http" && app_url.scheme() != "https" {
+    return Err("APP_URL must use HTTP or HTTPS.".to_string());
   }
 
   let app_host = app_url

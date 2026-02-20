@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
     "productName": "CRA Client",
-    "version": "0.1.6"
+    "version": "0.1.7"
   },
   "build": {
     "beforeDevCommand": "npm run dev",

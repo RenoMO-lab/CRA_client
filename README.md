@@ -5,9 +5,10 @@ Windows desktop wrapper for the CRA web application. The desktop app does not ho
 ## Primary target host
 
 Primary web app target is:
-- `https://192.168.50.55` (release / installed app)
+- `http://192.168.50.55:3000` (internal HTTP deployment)
 
-HTTP (`http://192.168.50.55:3000`) is test-only for development scenarios.
+Planned production target after TLS setup:
+- `https://192.168.50.55`
 
 ## Runtime configuration
 
@@ -42,26 +43,29 @@ WINDOW_HEIGHT=800
 Release `client.env`:
 
 ```env
-APP_URL=https://192.168.50.55
+APP_URL=http://192.168.50.55:3000
 ALLOWED_HOSTS=192.168.50.55
 WINDOW_TITLE=CRA Client
 WINDOW_WIDTH=1280
 WINDOW_HEIGHT=800
 ```
 
-Note: In release builds, `APP_URL` must be HTTPS.
+Release builds in this internal profile accept HTTP or HTTPS `APP_URL`.
 
 ### First run behavior
 
 If `%APPDATA%\CRA Client\client.env` does not exist, the app creates it with:
 
 ```env
-APP_URL=https://192.168.50.55
+APP_URL=http://192.168.50.55:3000
 ALLOWED_HOSTS=192.168.50.55
 WINDOW_TITLE=CRA Client
 WINDOW_WIDTH=1280
 WINDOW_HEIGHT=800
 ```
+
+Upgrade note from `v0.1.6`:
+- If app data still has the previous auto-generated `APP_URL=https://192.168.50.55`, `v0.1.7` migrates it automatically to `http://192.168.50.55:3000`.
 
 ## Development
 
@@ -104,12 +108,12 @@ Use Caddy on the server host to terminate TLS and reverse proxy to the Node app 
 Repackage built installer into required name format:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -Version 0.1.6
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -Version 0.1.7
 ```
 
 Result:
-- `artifacts/CRA-Client-0.1.6-windows-x64.exe`
-- `artifacts/CRA-Client-0.1.6-windows-x64.exe.sha256`
+- `artifacts/CRA-Client-0.1.7-windows-x64.exe`
+- `artifacts/CRA-Client-0.1.7-windows-x64.exe.sha256`
 
 ## Security and behavior
 
@@ -119,7 +123,7 @@ Result:
 - If unreachable, it shows retry UI without restart.
 - Navigation is restricted to `ALLOWED_HOSTS` inside the app.
 - Non-allowlisted links are blocked and stay inside the desktop app.
-- In release builds, `APP_URL` must use HTTPS.
+- This internal build supports HTTP and HTTPS targets.
 
 ## About
 
@@ -145,5 +149,7 @@ Tag-based GitHub Actions workflow:
   - Ensure `package.json` is UTF-8 without BOM. The release workflow includes a normalization step.
 - App opens Edge/Chrome to `https://tauri.localhost` and app window does not continue
   - Upgrade to `v0.1.6` or later. This version keeps Tauri internal bootstrap URLs in-app and blocks browser pop-out.
+- Server unreachable at `https://192.168.50.55/` while your server is HTTP-only
+  - Use `v0.1.7` or later, which supports internal HTTP target `http://192.168.50.55:3000`.
 - `Could not reach server at http://192.168.50.55:3000`
   - Verify network path/firewall and that the server process is listening on port `3000`.
