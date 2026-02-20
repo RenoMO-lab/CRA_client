@@ -1,4 +1,4 @@
-﻿import "./styles.css";
+import "./styles.css";
 import { invoke } from "@tauri-apps/api/tauri";
 
 type BootstrapState = {
@@ -54,25 +54,29 @@ app.innerHTML = `
   </main>
 `;
 
-const statusEl = document.querySelector<HTMLDivElement>("#status");
-const subtitleEl = document.querySelector<HTMLParagraphElement>("#subtitle");
-const detailsEl = document.querySelector<HTMLParagraphElement>("#details");
-const retryBtn = document.querySelector<HTMLButtonElement>("#retry");
-const aboutBtn = document.querySelector<HTMLButtonElement>("#about");
-const aboutDialog = document.querySelector<HTMLDialogElement>("#aboutDialog");
-const aboutBody = document.querySelector<HTMLParagraphElement>("#aboutBody");
-
-if (!statusEl || !subtitleEl || !detailsEl || !retryBtn || !aboutBtn || !aboutDialog || !aboutBody) {
-  throw new Error("Missing required DOM elements");
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) {
+    throw new Error(`Missing required DOM element: ${selector}`);
+  }
+  return element;
 }
 
+const status = requiredElement<HTMLDivElement>("#status");
+const subtitle = requiredElement<HTMLParagraphElement>("#subtitle");
+const details = requiredElement<HTMLParagraphElement>("#details");
+const retry = requiredElement<HTMLButtonElement>("#retry");
+const about = requiredElement<HTMLButtonElement>("#about");
+const aboutDialog = requiredElement<HTMLDialogElement>("#aboutDialog");
+const aboutBody = requiredElement<HTMLParagraphElement>("#aboutBody");
+
 function setStatus(kind: "loading" | "ok" | "error", message: string): void {
-  statusEl.className = `status ${kind}`;
-  statusEl.textContent = message;
+  status.className = `status ${kind}`;
+  status.textContent = message;
 }
 
 function setDetails(message: string): void {
-  detailsEl.textContent = message;
+  details.textContent = message;
 }
 
 async function showAboutDialog(): Promise<void> {
@@ -88,28 +92,28 @@ async function showAboutDialog(): Promise<void> {
 async function openRemoteApp(): Promise<void> {
   setStatus("loading", "Opening remote app...");
   setDetails("Please wait while the desktop client switches to the web application.");
-  retryBtn.disabled = true;
+  retry.disabled = true;
 
   try {
     await invoke("launch_app");
   } catch (error) {
     setStatus("error", "Could not open the app.");
     setDetails(String(error));
-    retryBtn.disabled = false;
+    retry.disabled = false;
   }
 }
 
 async function retryConnection(): Promise<void> {
   setStatus("loading", "Retrying connection...");
   setDetails("Attempting to reach the server again.");
-  retryBtn.disabled = true;
+  retry.disabled = true;
 
   try {
     await invoke("retry_connect");
   } catch (error) {
     setStatus("error", "Server is still unreachable.");
     setDetails(String(error));
-    retryBtn.disabled = false;
+    retry.disabled = false;
   }
 }
 
@@ -120,12 +124,12 @@ async function bootstrap(): Promise<void> {
   try {
     const state = await invoke<BootstrapState>("bootstrap_state");
 
-    subtitleEl.textContent = `Version ${state.version}`;
+    subtitle.textContent = `Version ${state.version}`;
 
     if (!state.ready || state.config_error) {
       setStatus("error", "Configuration error");
       setDetails(state.config_error ?? "Runtime configuration is incomplete.");
-      retryBtn.disabled = true;
+      retry.disabled = true;
       return;
     }
 
@@ -136,19 +140,19 @@ async function bootstrap(): Promise<void> {
 
     setStatus("error", "Server unreachable");
     setDetails(state.reachability_error ?? "The server did not respond.");
-    retryBtn.disabled = false;
+    retry.disabled = false;
   } catch (error) {
     setStatus("error", "Bootstrap failed");
     setDetails(String(error));
-    retryBtn.disabled = false;
+    retry.disabled = false;
   }
 }
 
-retryBtn.addEventListener("click", () => {
+retry.addEventListener("click", () => {
   void retryConnection();
 });
 
-aboutBtn.addEventListener("click", () => {
+about.addEventListener("click", () => {
   void showAboutDialog();
 });
 
