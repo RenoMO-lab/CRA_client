@@ -12,14 +12,25 @@ Planned production target after TLS setup:
 
 ## Runtime configuration
 
-The app reads settings from environment variables first, then from `client.env` files.
+The app reads settings from namespaced environment variables first, then from `client.env` files.
 On first run, it auto-creates `%APPDATA%\CRA Client\client.env` if missing.
 
 Resolution order:
-1. Process environment variables.
+1. Process environment variables (`CRA_CLIENT_*` only).
 2. `client.env` in current working directory.
 3. `client.env` next to the executable.
 4. `%APPDATA%\CRA Client\client.env`.
+
+Supported process environment variables:
+- `CRA_CLIENT_APP_URL`
+- `CRA_CLIENT_ALLOWED_HOSTS`
+- `CRA_CLIENT_WINDOW_TITLE`
+- `CRA_CLIENT_WINDOW_WIDTH`
+- `CRA_CLIENT_WINDOW_HEIGHT`
+- `CRA_CLIENT_ALLOW_LOCALHOST_RELEASE` (optional, default `false`)
+
+`APP_URL` and `ALLOWED_HOSTS` remain supported in `client.env` for backward compatibility.
+Generic process env keys like `APP_URL` / `ALLOWED_HOSTS` are intentionally ignored to prevent host pollution from unrelated machine variables.
 
 Required keys:
 - `APP_URL`: Target URL of the existing web app.
@@ -51,6 +62,7 @@ WINDOW_HEIGHT=800
 ```
 
 Release builds in this internal profile accept HTTP or HTTPS `APP_URL`.
+Release builds reject localhost-style `APP_URL` hosts (`localhost`, `127.0.0.1`, `::1`, `tauri.localhost`) unless `CRA_CLIENT_ALLOW_LOCALHOST_RELEASE=true` is explicitly set.
 
 ### First run behavior
 
@@ -108,12 +120,12 @@ Use Caddy on the server host to terminate TLS and reverse proxy to the Node app 
 Repackage built installer into required name format:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -Version 0.1.7
+powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1 -Version 0.1.14
 ```
 
 Result:
-- `artifacts/CRA-Client-0.1.7-windows-x64.exe`
-- `artifacts/CRA-Client-0.1.7-windows-x64.exe.sha256`
+- `artifacts/CRA-Client-0.1.14-windows-x64.exe`
+- `artifacts/CRA-Client-0.1.14-windows-x64.exe.sha256`
 
 ## Security and behavior
 
@@ -124,6 +136,7 @@ Result:
 - Navigation is restricted to `ALLOWED_HOSTS` inside the app.
 - Non-allowlisted links are blocked and stay inside the desktop app.
 - This internal build supports HTTP and HTTPS targets.
+- Startup diagnostics are appended to `%APPDATA%\CRA Client\logs\startup.log`.
 
 ## About
 

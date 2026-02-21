@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
     "productName": "CRA Client",
-    "version": "0.1.13"
+    "version": "0.1.14"
   },
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -23,7 +23,8 @@
       "icon": ["icons/icon.ico"],
       "windows": {
         "nsis": {
-          "installerIcon": "icons/icon.ico"
+          "installerIcon": "icons/icon.ico",
+          "template": "windows/nsis/installer.nsi"
         }
       }
     },
