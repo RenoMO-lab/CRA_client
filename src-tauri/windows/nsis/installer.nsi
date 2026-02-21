@@ -27,6 +27,7 @@ ${StrLoc}
 !define HEADERIMAGE "{{header_image}}"
 !define MAINBINARYNAME "{{main_binary_name}}"
 !define MAINBINARYSRCPATH "{{main_binary_path}}"
+!define SHORTCUTNAME "CRA"
 !define BUNDLEID "{{bundle_id}}"
 !define COPYRIGHT "{{copyright}}"
 !define OUTFILE "{{out_file}}"
@@ -665,14 +666,18 @@ Section Uninstall
   !insertmacro DeleteAppUserModelId
   !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${MAINBINARYNAME}.lnk"
   !insertmacro UnpinShortcut "$DESKTOP\${MAINBINARYNAME}.lnk"
+  !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${SHORTCUTNAME}.lnk"
+  !insertmacro UnpinShortcut "$DESKTOP\${SHORTCUTNAME}.lnk"
 
   ; Remove start menu shortcut
   !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
   Delete "$SMPROGRAMS\$AppStartMenuFolder\${MAINBINARYNAME}.lnk"
+  Delete "$SMPROGRAMS\$AppStartMenuFolder\${SHORTCUTNAME}.lnk"
   RMDir "$SMPROGRAMS\$AppStartMenuFolder"
 
   ; Remove desktop shortcuts
   Delete "$DESKTOP\${MAINBINARYNAME}.lnk"
+  Delete "$DESKTOP\${SHORTCUTNAME}.lnk"
 
   ; Remove registry information for add/remove programs
   !if "${INSTALLMODE}" == "both"
@@ -734,13 +739,17 @@ FunctionEnd
 !macroend
 
 Function CreateDesktopShortcut
-  CreateShortcut "$DESKTOP\${MAINBINARYNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
-  !insertmacro SetLnkAppUserModelId "$DESKTOP\${MAINBINARYNAME}.lnk"
+  Delete "$DESKTOP\${MAINBINARYNAME}.lnk"
+  Delete "$DESKTOP\${SHORTCUTNAME}.lnk"
+  CreateShortcut "$DESKTOP\${SHORTCUTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
+  !insertmacro SetLnkAppUserModelId "$DESKTOP\${SHORTCUTNAME}.lnk"
 FunctionEnd
 
 Function CreateStartMenuShortcut
   CreateDirectory "$SMPROGRAMS\$AppStartMenuFolder"
-  CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${MAINBINARYNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
-  !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\$AppStartMenuFolder\${MAINBINARYNAME}.lnk"
+  Delete "$SMPROGRAMS\$AppStartMenuFolder\${MAINBINARYNAME}.lnk"
+  Delete "$SMPROGRAMS\$AppStartMenuFolder\${SHORTCUTNAME}.lnk"
+  CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${SHORTCUTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
+  !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\$AppStartMenuFolder\${SHORTCUTNAME}.lnk"
 FunctionEnd
 

@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State, Window, WindowUrl};
 use url::Url;
 
-const DEFAULT_TITLE: &str = "CRA Client";
+const DEFAULT_TITLE: &str = "CRA";
 const DEFAULT_WIDTH: f64 = 1280.0;
 const DEFAULT_HEIGHT: f64 = 800.0;
 const DEFAULT_APP_URL: &str = "http://192.168.50.55:3000";

@@ -30,7 +30,7 @@ app.innerHTML = `
   <main class="shell">
     <section class="startup-card">
       <div class="spinner" aria-hidden="true"></div>
-      <h1>CRA Client</h1>
+      <h1>CRA</h1>
       <p id="subtitle" class="muted">Connecting to server...</p>
       <div id="status" class="status loading">Checking server reachability...</div>
       <p id="details" class="details hidden"></p>
@@ -43,7 +43,7 @@ app.innerHTML = `
 
     <dialog id="aboutDialog">
       <form method="dialog">
-        <h2>About CRA Client</h2>
+        <h2>About CRA</h2>
         <p id="aboutBody"></p>
         <div class="actions">
           <button type="submit">Close</button>
