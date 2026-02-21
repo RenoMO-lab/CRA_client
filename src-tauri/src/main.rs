@@ -771,7 +771,8 @@ fn main() {
             let mut allowed_hosts_for_log: Vec<String> = allowed_hosts.iter().cloned().collect();
             allowed_hosts_for_log.sort();
             let allowed_hosts_for_log = allowed_hosts_for_log.join(",");
-            let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.png").to_vec());
+            // Use the same ICO payload as installer/exe resources so runtime taskbar icon matches.
+            let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.ico").to_vec());
             let webview_data_path = appdata_webview_data_path();
 
             let mut window_builder =
