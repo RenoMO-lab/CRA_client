@@ -11,7 +11,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(140deg, #f4f7fb, #dde8f6);
+  background: radial-gradient(circle at top, #183049 0%, #0c1624 58%, #090f17 100%);
   color: #182433;
 }
 
@@ -19,21 +19,23 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 20px;
 }
 
-.card {
-  width: min(680px, 100%);
-  background: #ffffff;
-  border: 1px solid #d9e2ef;
-  border-radius: 16px;
-  box-shadow: 0 14px 36px rgba(16, 39, 74, 0.12);
-  padding: 28px;
+.startup-card {
+  width: min(340px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(189, 209, 234, 0.2);
+  background: rgba(8, 16, 27, 0.86);
+  box-shadow: 0 24px 42px rgba(4, 10, 18, 0.45);
+  padding: 24px 22px;
+  text-align: center;
 }
 
 h1 {
-  margin: 0;
-  font-size: 1.45rem;
+  margin: 12px 0 0;
+  color: #f7fbff;
+  font-size: 1.2rem;
 }
 
 h2 {
@@ -41,52 +43,52 @@ h2 {
 }
 
 .muted {
-  margin-top: 8px;
-  color: #4e627a;
+  margin-top: 6px;
+  color: #a7b6c9;
+  font-size: 0.92rem;
 }
 
 .status {
-  margin-top: 18px;
-  padding: 12px 14px;
-  border-radius: 10px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 0.86rem;
   font-weight: 600;
 }
 
 .status.loading {
-  background: #eef4fd;
-  color: #2a4d79;
-}
-
-.status.ok {
-  background: #e8f7ec;
-  color: #1f6c3b;
+  background: rgba(24, 58, 96, 0.42);
+  color: #d5e9ff;
 }
 
 .status.error {
-  background: #fff0ef;
-  color: #9a2920;
+  background: rgba(152, 30, 35, 0.18);
+  color: #ffd6d6;
 }
 
 .details {
-  margin-top: 12px;
-  color: #3b4d63;
+  margin-top: 10px;
+  color: #d2dfef;
+  font-size: 0.82rem;
+  text-align: left;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .actions {
-  margin-top: 18px;
+  margin-top: 12px;
   display: flex;
   gap: 10px;
+  justify-content: center;
 }
 
 button {
-  border: 1px solid #2f5d92;
-  background: #2f5d92;
+  border: 1px solid #2e76c0;
+  background: #2e76c0;
   color: #fff;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 0.86rem;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
@@ -96,8 +98,9 @@ button[disabled] {
 }
 
 button:nth-of-type(2) {
-  background: #fff;
-  color: #2f5d92;
+  background: transparent;
+  color: #bfdcff;
+  border-color: rgba(163, 198, 235, 0.5);
 }
 
 dialog {
@@ -109,4 +112,24 @@ dialog {
 
 dialog::backdrop {
   background: rgba(14, 27, 45, 0.45);
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  border: 3px solid rgba(166, 197, 232, 0.35);
+  border-top-color: #f74d4d;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -175,12 +175,28 @@ async fn launch_app(window: Window, state: State<'_, AppState>) -> Result<(), St
 
     window
         .eval(&format!("window.location.replace(\"{}\");", target))
-        .map_err(|error| format!("Failed to navigate to APP_URL: {error}"))
+        .map_err(|error| format!("Failed to navigate to APP_URL: {error}"))?;
+
+    window
+        .show()
+        .map_err(|error| format!("Failed to show main window: {error}"))?;
+    let _ = window.set_focus();
+
+    Ok(())
 }
 
 #[tauri::command]
 async fn retry_connect(window: Window, state: State<'_, AppState>) -> Result<(), String> {
     launch_app(window, state).await
+}
+
+#[tauri::command]
+fn show_main_window(window: Window) -> Result<(), String> {
+    window
+        .show()
+        .map_err(|error| format!("Failed to show main window: {error}"))?;
+    let _ = window.set_focus();
+    Ok(())
 }
 
 #[tauri::command]
@@ -390,6 +406,14 @@ fn appdata_client_env_path() -> Option<PathBuf> {
         PathBuf::from(app_data)
             .join("CRA Client")
             .join("client.env")
+    })
+}
+
+fn appdata_webview_data_path() -> Option<PathBuf> {
+    std::env::var("APPDATA").ok().map(|app_data| {
+        PathBuf::from(app_data)
+            .join("CRA Client")
+            .join("webview")
     })
 }
 
@@ -748,12 +772,14 @@ fn main() {
             allowed_hosts_for_log.sort();
             let allowed_hosts_for_log = allowed_hosts_for_log.join(",");
             let app_icon = tauri::Icon::Raw(include_bytes!("../icons/icon.png").to_vec());
+            let webview_data_path = appdata_webview_data_path();
 
             let mut window_builder =
                 tauri::WindowBuilder::new(app, "main", WindowUrl::App("index.html".into()))
                     .title(window_title)
                     .inner_size(window_width, window_height)
                     .resizable(true)
+                    .visible(false)
                     .initialization_script(INIT_SCRIPT)
                     .on_navigation(move |url| {
                         if is_allowed_navigation(&url, &allowed_hosts) {
@@ -769,6 +795,12 @@ fn main() {
                         false
                     });
 
+            if let Some(path) = webview_data_path {
+                fs::create_dir_all(&path)
+                    .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
+                window_builder = window_builder.data_directory(path);
+            }
+
             window_builder = window_builder
                 .icon(app_icon)
                 .map_err(|error| -> Box<dyn std::error::Error> { Box::new(error) })?;
@@ -783,6 +815,7 @@ fn main() {
             bootstrap_state,
             launch_app,
             retry_connect,
+            show_main_window,
             get_about_info
         ])
         .run(tauri::generate_context!())

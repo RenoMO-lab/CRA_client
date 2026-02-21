@@ -28,18 +28,17 @@ if (!app) {
 
 app.innerHTML = `
   <main class="shell">
-    <section class="card">
+    <section class="startup-card">
+      <div class="spinner" aria-hidden="true"></div>
       <h1>CRA Client</h1>
-      <p id="subtitle" class="muted">Initializing desktop client...</p>
-
+      <p id="subtitle" class="muted">Connecting to server...</p>
       <div id="status" class="status loading">Checking server reachability...</div>
+      <p id="details" class="details hidden"></p>
 
-      <div class="actions">
+      <div id="actions" class="actions hidden">
         <button id="retry" type="button" disabled>Retry</button>
         <button id="about" type="button">About</button>
       </div>
-
-      <p id="details" class="details"></p>
     </section>
 
     <dialog id="aboutDialog">
@@ -65,10 +64,13 @@ function requiredElement<T extends Element>(selector: string): T {
 const status = requiredElement<HTMLDivElement>("#status");
 const subtitle = requiredElement<HTMLParagraphElement>("#subtitle");
 const details = requiredElement<HTMLParagraphElement>("#details");
+const actions = requiredElement<HTMLDivElement>("#actions");
 const retry = requiredElement<HTMLButtonElement>("#retry");
 const about = requiredElement<HTMLButtonElement>("#about");
 const aboutDialog = requiredElement<HTMLDialogElement>("#aboutDialog");
 const aboutBody = requiredElement<HTMLParagraphElement>("#aboutBody");
+
+let windowVisible = false;
 
 function setStatus(kind: "loading" | "ok" | "error", message: string): void {
   status.className = `status ${kind}`;
@@ -77,6 +79,31 @@ function setStatus(kind: "loading" | "ok" | "error", message: string): void {
 
 function setDetails(message: string): void {
   details.textContent = message;
+}
+
+function setLoaderMode(): void {
+  details.classList.add("hidden");
+  actions.classList.add("hidden");
+  retry.disabled = true;
+}
+
+function setErrorMode(message: string): void {
+  setDetails(message);
+  details.classList.remove("hidden");
+  actions.classList.remove("hidden");
+  retry.disabled = false;
+}
+
+async function ensureMainWindowVisible(): Promise<void> {
+  if (windowVisible) {
+    return;
+  }
+  try {
+    await invoke("show_main_window");
+    windowVisible = true;
+  } catch {
+    // Keep retry flow available even if visibility command fails.
+  }
 }
 
 async function showAboutDialog(): Promise<void> {
@@ -91,35 +118,33 @@ async function showAboutDialog(): Promise<void> {
 
 async function openRemoteApp(): Promise<void> {
   setStatus("loading", "Opening remote app...");
-  setDetails("Please wait while the desktop client switches to the web application.");
-  retry.disabled = true;
+  setLoaderMode();
 
   try {
     await invoke("launch_app");
   } catch (error) {
+    await ensureMainWindowVisible();
     setStatus("error", "Could not open the app.");
-    setDetails(String(error));
-    retry.disabled = false;
+    setErrorMode(String(error));
   }
 }
 
 async function retryConnection(): Promise<void> {
   setStatus("loading", "Retrying connection...");
-  setDetails("Attempting to reach the server again.");
-  retry.disabled = true;
+  setLoaderMode();
 
   try {
     await invoke("retry_connect");
   } catch (error) {
+    await ensureMainWindowVisible();
     setStatus("error", "Server is still unreachable.");
-    setDetails(String(error));
-    retry.disabled = false;
+    setErrorMode(String(error));
   }
 }
 
 async function bootstrap(): Promise<void> {
   setStatus("loading", "Checking configuration...");
-  setDetails("Loading runtime settings and validating connectivity.");
+  setLoaderMode();
 
   try {
     const state = await invoke<BootstrapState>("bootstrap_state");
@@ -127,8 +152,9 @@ async function bootstrap(): Promise<void> {
     subtitle.textContent = `Version ${state.version}`;
 
     if (!state.ready || state.config_error) {
+      await ensureMainWindowVisible();
       setStatus("error", "Configuration error");
-      setDetails(state.config_error ?? "Runtime configuration is incomplete.");
+      setErrorMode(state.config_error ?? "Runtime configuration is incomplete.");
       retry.disabled = true;
       return;
     }
@@ -138,13 +164,13 @@ async function bootstrap(): Promise<void> {
       return;
     }
 
+    await ensureMainWindowVisible();
     setStatus("error", "Server unreachable");
-    setDetails(state.reachability_error ?? "The server did not respond.");
-    retry.disabled = false;
+    setErrorMode(state.reachability_error ?? "The server did not respond.");
   } catch (error) {
+    await ensureMainWindowVisible();
     setStatus("error", "Bootstrap failed");
-    setDetails(String(error));
-    retry.disabled = false;
+    setErrorMode(String(error));
   }
 }
 
