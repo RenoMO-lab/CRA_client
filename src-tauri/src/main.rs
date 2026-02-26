@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::OpenOptions;
@@ -22,6 +22,8 @@ const ENV_WINDOW_TITLE: &str = "CRA_CLIENT_WINDOW_TITLE";
 const ENV_WINDOW_WIDTH: &str = "CRA_CLIENT_WINDOW_WIDTH";
 const ENV_WINDOW_HEIGHT: &str = "CRA_CLIENT_WINDOW_HEIGHT";
 const ENV_ALLOW_LOCALHOST_RELEASE: &str = "CRA_CLIENT_ALLOW_LOCALHOST_RELEASE";
+const ENV_MIN_WEB_BUILD_HASH: &str = "CRA_CLIENT_MIN_WEB_BUILD_HASH";
+const ENV_ENFORCE_WEB_BUILD: &str = "CRA_CLIENT_ENFORCE_WEB_BUILD";
 
 const INIT_SCRIPT: &str = r#"
 (() => {
@@ -83,6 +85,8 @@ struct RuntimeConfig {
     window_title: String,
     window_width: f64,
     window_height: f64,
+    min_web_build_hash: Option<String>,
+    enforce_web_build: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +107,12 @@ struct BootstrapState {
     version: String,
     reachable: bool,
     reachability_error: Option<String>,
+    web_build_hash: Option<String>,
+    web_build_time: Option<String>,
+    required_web_build_hash: Option<String>,
+    build_parity_ok: bool,
+    build_parity_error: Option<String>,
+    enforce_web_build: bool,
 }
 
 #[derive(Serialize)]
@@ -111,6 +121,41 @@ struct AboutInfo {
     version: String,
     app_host: String,
     app_url: String,
+    required_web_build_hash: Option<String>,
+    enforce_web_build: bool,
+    web_build_hash: Option<String>,
+    web_build_time: Option<String>,
+    web_build_error: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DeployInfoResponse {
+    #[serde(default)]
+    build: Option<DeployInfoBuild>,
+    #[serde(default)]
+    git: Option<DeployInfoGit>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DeployInfoBuild {
+    #[serde(default)]
+    hash: Option<String>,
+    #[serde(default, rename = "builtAt")]
+    built_at: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DeployInfoGit {
+    #[serde(default)]
+    hash: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct BuildParityResult {
+    web_build_hash: Option<String>,
+    web_build_time: Option<String>,
+    parity_ok: bool,
+    parity_error: Option<String>,
 }
 
 #[tauri::command]
@@ -129,6 +174,12 @@ async fn bootstrap_state(state: State<'_, AppState>) -> Result<BootstrapState, S
             version,
             reachable: false,
             reachability_error: None,
+            web_build_hash: None,
+            web_build_time: None,
+            required_web_build_hash: None,
+            build_parity_ok: true,
+            build_parity_error: None,
+            enforce_web_build: false,
         });
     }
 
@@ -144,10 +195,32 @@ async fn bootstrap_state(state: State<'_, AppState>) -> Result<BootstrapState, S
             version,
             reachable: false,
             reachability_error: None,
+            web_build_hash: None,
+            web_build_time: None,
+            required_web_build_hash: None,
+            build_parity_ok: true,
+            build_parity_error: None,
+            enforce_web_build: false,
         });
     };
 
     let reachability = check_server_reachable(&config.app_url).await;
+    let build_parity = check_web_build_parity(config).await;
+    let parity_ok = build_parity.parity_ok;
+    let parity_error = build_parity.parity_error.clone();
+    append_startup_log_entry(&format!(
+        "build_parity_result=ok:{} required_hash={} web_hash={} error={}",
+        parity_ok,
+        config
+            .min_web_build_hash
+            .clone()
+            .unwrap_or_else(|| "-".to_string()),
+        build_parity
+            .web_build_hash
+            .clone()
+            .unwrap_or_else(|| "-".to_string()),
+        parity_error.clone().unwrap_or_else(|| "-".to_string())
+    ));
 
     Ok(BootstrapState {
         ready: true,
@@ -160,6 +233,12 @@ async fn bootstrap_state(state: State<'_, AppState>) -> Result<BootstrapState, S
         version,
         reachable: reachability.is_ok(),
         reachability_error: reachability.err(),
+        web_build_hash: build_parity.web_build_hash,
+        web_build_time: build_parity.web_build_time,
+        required_web_build_hash: config.min_web_build_hash.clone(),
+        build_parity_ok: parity_ok,
+        build_parity_error: parity_error,
+        enforce_web_build: config.enforce_web_build,
     })
 }
 
@@ -167,6 +246,12 @@ async fn bootstrap_state(state: State<'_, AppState>) -> Result<BootstrapState, S
 async fn launch_app(window: Window, state: State<'_, AppState>) -> Result<(), String> {
     let config = get_config(&state)?;
     check_server_reachable(&config.app_url).await?;
+    let build_parity = check_web_build_parity(&config).await;
+    if !build_parity.parity_ok && config.enforce_web_build {
+        return Err(build_parity.parity_error.unwrap_or_else(|| {
+            "Server build does not satisfy required minimum build hash.".to_string()
+        }));
+    }
     let target = config
         .app_url
         .to_string()
@@ -200,8 +285,9 @@ fn show_main_window(window: Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
+async fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
     if let Some(config) = &state.config {
+        let parity = check_web_build_parity(config).await;
         return AboutInfo {
             title: config.window_title.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -211,6 +297,11 @@ fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
                 .unwrap_or("unknown-host")
                 .to_string(),
             app_url: config.app_url.to_string(),
+            required_web_build_hash: config.min_web_build_hash.clone(),
+            enforce_web_build: config.enforce_web_build,
+            web_build_hash: parity.web_build_hash,
+            web_build_time: parity.web_build_time,
+            web_build_error: parity.parity_error,
         };
     }
 
@@ -219,6 +310,11 @@ fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         app_host: "not-configured".to_string(),
         app_url: "not-configured".to_string(),
+        required_web_build_hash: None,
+        enforce_web_build: false,
+        web_build_hash: None,
+        web_build_time: None,
+        web_build_error: None,
     }
 }
 
@@ -257,6 +353,118 @@ async fn check_server_reachable(url: &Url) -> Result<(), String> {
         "Server responded with status {} when requesting {}",
         status, url
     ))
+}
+
+fn normalized_hash(value: &str) -> String {
+    value
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn deploy_info_url(app_url: &Url) -> Result<Url, String> {
+    let mut deploy_url = app_url.clone();
+    deploy_url
+        .set_path("/api/admin/deploy-info");
+    deploy_url.set_query(None);
+    deploy_url.set_fragment(None);
+    Ok(deploy_url)
+}
+
+async fn fetch_deploy_info(app_url: &Url) -> Result<(String, Option<String>), String> {
+    let deploy_url = deploy_info_url(app_url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|error| format!("HTTP client init failed: {error}"))?;
+
+    let response = client
+        .get(deploy_url.clone())
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch deploy info at {deploy_url}: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Deploy info endpoint returned status {} at {}",
+            response.status(),
+            deploy_url
+        ));
+    }
+
+    let payload = response
+        .json::<DeployInfoResponse>()
+        .await
+        .map_err(|error| format!("Invalid deploy info response: {error}"))?;
+
+    let hash = payload
+        .build
+        .as_ref()
+        .and_then(|value| value.hash.clone())
+        .or_else(|| payload.git.as_ref().and_then(|value| value.hash.clone()))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "Deploy info does not include a build or git hash.".to_string())?;
+
+    let build_time = payload
+        .build
+        .as_ref()
+        .and_then(|value| value.built_at.clone())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    Ok((hash, build_time))
+}
+
+async fn check_web_build_parity(config: &RuntimeConfig) -> BuildParityResult {
+    let Some(required_raw) = config.min_web_build_hash.clone() else {
+        return BuildParityResult {
+            web_build_hash: None,
+            web_build_time: None,
+            parity_ok: true,
+            parity_error: None,
+        };
+    };
+
+    let required = normalized_hash(&required_raw);
+    if required.is_empty() {
+        return BuildParityResult {
+            web_build_hash: None,
+            web_build_time: None,
+            parity_ok: true,
+            parity_error: None,
+        };
+    }
+
+    match fetch_deploy_info(&config.app_url).await {
+        Ok((web_hash_raw, web_build_time)) => {
+            let web_hash = normalized_hash(&web_hash_raw);
+            let parity_ok = web_hash.starts_with(&required);
+            let parity_error = if parity_ok {
+                None
+            } else {
+                Some(format!(
+                    "Server build hash '{}' does not match required minimum hash '{}'.",
+                    web_hash_raw, required_raw
+                ))
+            };
+
+            BuildParityResult {
+                web_build_hash: Some(web_hash_raw),
+                web_build_time,
+                parity_ok,
+                parity_error,
+            }
+        }
+        Err(error) => BuildParityResult {
+            web_build_hash: None,
+            web_build_time: None,
+            parity_ok: !config.enforce_web_build,
+            parity_error: Some(format!("Could not verify server build hash: {error}")),
+        },
+    }
 }
 
 fn normalize_host(value: &str) -> String {
@@ -425,12 +633,16 @@ APP_URL={}\n\
 ALLOWED_HOSTS={}\n\
 WINDOW_TITLE={}\n\
 WINDOW_WIDTH={}\n\
-WINDOW_HEIGHT={}\n",
+WINDOW_HEIGHT={}\n\
+# Optional parity gate settings:\n\
+# MIN_WEB_BUILD_HASH=\n\
+# ENFORCE_WEB_BUILD={}\n",
         DEFAULT_APP_URL,
         DEFAULT_ALLOWED_HOSTS,
         DEFAULT_TITLE,
         DEFAULT_WIDTH as i64,
-        DEFAULT_HEIGHT as i64
+        DEFAULT_HEIGHT as i64,
+        if cfg!(debug_assertions) { "false" } else { "true" }
     )
 }
 
@@ -686,6 +898,27 @@ fn load_runtime_config() -> (Result<RuntimeConfig, String>, Vec<String>) {
     };
     diagnostics.push(format!("window_height_source={window_height_source}"));
 
+    let (min_web_build_hash, min_web_build_hash_source) =
+        read_optional_value("MIN_WEB_BUILD_HASH", Some(ENV_MIN_WEB_BUILD_HASH), &file_values)
+            .map(|(value, source)| (Some(value), source))
+            .unwrap_or_else(|| (None, "not-set".to_string()));
+    diagnostics.push(format!("min_web_build_hash_source={min_web_build_hash_source}"));
+
+    let default_enforce_web_build = !cfg!(debug_assertions);
+    let (enforce_web_build, enforce_web_build_source) = match read_bool_value(
+        "ENFORCE_WEB_BUILD",
+        Some(ENV_ENFORCE_WEB_BUILD),
+        default_enforce_web_build,
+        &file_values,
+    ) {
+        Ok(value) => value,
+        Err(error) => return (Err(error), diagnostics),
+    };
+    diagnostics.push(format!(
+        "enforce_web_build={} ({enforce_web_build_source})",
+        enforce_web_build
+    ));
+
     diagnostics.push(format!("resolved_app_url={app_url}"));
     diagnostics.push(format!("resolved_allowed_hosts={}", {
         let mut hosts: Vec<String> = allowed_hosts.iter().cloned().collect();
@@ -700,6 +933,8 @@ fn load_runtime_config() -> (Result<RuntimeConfig, String>, Vec<String>) {
             window_title,
             window_width,
             window_height,
+            min_web_build_hash,
+            enforce_web_build,
         }),
         diagnostics,
     )

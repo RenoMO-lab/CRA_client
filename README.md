@@ -28,6 +28,8 @@ Supported process environment variables:
 - `CRA_CLIENT_WINDOW_WIDTH`
 - `CRA_CLIENT_WINDOW_HEIGHT`
 - `CRA_CLIENT_ALLOW_LOCALHOST_RELEASE` (optional, default `false`)
+- `CRA_CLIENT_MIN_WEB_BUILD_HASH` (optional parity gate)
+- `CRA_CLIENT_ENFORCE_WEB_BUILD` (optional, `true|false`)
 
 `APP_URL` and `ALLOWED_HOSTS` remain supported in `client.env` for backward compatibility.
 Generic process env keys like `APP_URL` / `ALLOWED_HOSTS` are intentionally ignored to prevent host pollution from unrelated machine variables.
@@ -40,6 +42,8 @@ Optional keys:
 - `WINDOW_TITLE` (default `CRA Client`)
 - `WINDOW_WIDTH` (default `1280`)
 - `WINDOW_HEIGHT` (default `800`)
+- `MIN_WEB_BUILD_HASH` (optional required minimum web build hash/prefix)
+- `ENFORCE_WEB_BUILD` (optional, defaults: release `true`, debug `false`)
 
 Development `client.env` (current deployment):
 
@@ -63,6 +67,26 @@ WINDOW_HEIGHT=800
 
 Release builds in this internal profile accept HTTP or HTTPS `APP_URL`.
 Release builds reject localhost-style `APP_URL` hosts (`localhost`, `127.0.0.1`, `::1`, `tauri.localhost`) unless `CRA_CLIENT_ALLOW_LOCALHOST_RELEASE=true` is explicitly set.
+
+### Web build parity gate
+
+To guarantee CRA Client opens only an up-to-date web deployment, set:
+
+```env
+MIN_WEB_BUILD_HASH=aacb669
+ENFORCE_WEB_BUILD=true
+```
+
+Behavior:
+- CRA Client requests `${APP_URL}/api/admin/deploy-info`.
+- It compares `build.hash` (fallback `git.hash`) with `MIN_WEB_BUILD_HASH` (prefix match, case-insensitive).
+- If mismatch and `ENFORCE_WEB_BUILD=true`, app launch is blocked with retry/about diagnostics.
+- If mismatch and `ENFORCE_WEB_BUILD=false`, warning is shown and launch continues.
+
+About dialog and startup log include:
+- connected web build hash/time
+- required minimum hash
+- parity enforcement mode
 
 ### First run behavior
 

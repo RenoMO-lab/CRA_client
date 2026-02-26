@@ -12,6 +12,12 @@ type BootstrapState = {
   version: string;
   reachable: boolean;
   reachability_error: string | null;
+  web_build_hash?: string | null;
+  web_build_time?: string | null;
+  required_web_build_hash?: string | null;
+  build_parity_ok: boolean;
+  build_parity_error?: string | null;
+  enforce_web_build: boolean;
 };
 
 type AboutInfo = {
@@ -19,6 +25,11 @@ type AboutInfo = {
   version: string;
   app_host: string;
   app_url: string;
+  required_web_build_hash?: string | null;
+  enforce_web_build: boolean;
+  web_build_hash?: string | null;
+  web_build_time?: string | null;
+  web_build_error?: string | null;
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -72,7 +83,7 @@ const aboutBody = requiredElement<HTMLParagraphElement>("#aboutBody");
 
 let windowVisible = false;
 
-function setStatus(kind: "loading" | "ok" | "error", message: string): void {
+function setStatus(kind: "loading" | "ok" | "warning" | "error", message: string): void {
   status.className = `status ${kind}`;
   status.textContent = message;
 }
@@ -109,7 +120,20 @@ async function ensureMainWindowVisible(): Promise<void> {
 async function showAboutDialog(): Promise<void> {
   try {
     const info = await invoke<AboutInfo>("get_about_info");
-    aboutBody.textContent = `${info.title}\nVersion: ${info.version}\nTarget Host: ${info.app_host}\nURL: ${info.app_url}`;
+    const lines = [
+      `${info.title}`,
+      `Version: ${info.version}`,
+      `Target Host: ${info.app_host}`,
+      `URL: ${info.app_url}`,
+      `Web Build Hash: ${info.web_build_hash ?? "-"}`,
+      `Web Build Time: ${info.web_build_time ?? "-"}`,
+      `Required Build Hash: ${info.required_web_build_hash ?? "-"}`,
+      `Enforce Build Parity: ${info.enforce_web_build ? "true" : "false"}`,
+    ];
+    if (info.web_build_error) {
+      lines.push(`Build Check Error: ${info.web_build_error}`);
+    }
+    aboutBody.textContent = lines.join("\n");
   } catch (error) {
     aboutBody.textContent = `About information unavailable: ${String(error)}`;
   }
@@ -149,7 +173,7 @@ async function bootstrap(): Promise<void> {
   try {
     const state = await invoke<BootstrapState>("bootstrap_state");
 
-    subtitle.textContent = `Version ${state.version}`;
+    subtitle.textContent = `Version ${state.version} • Web ${state.web_build_hash ?? "-"}`;
 
     if (!state.ready || state.config_error) {
       await ensureMainWindowVisible();
@@ -160,6 +184,24 @@ async function bootstrap(): Promise<void> {
     }
 
     if (state.reachable) {
+      if (!state.build_parity_ok) {
+        const message =
+          state.build_parity_error ??
+          "Server build is older than required for this CRA Client.";
+        const withHints = `${message}\nConnected build: ${state.web_build_hash ?? "-"}\nRequired build: ${state.required_web_build_hash ?? "-"}`;
+
+        if (state.enforce_web_build) {
+          await ensureMainWindowVisible();
+          setStatus("error", "Build parity check failed");
+          setErrorMode(withHints);
+          return;
+        }
+
+        setStatus("warning", "Build parity warning");
+        setDetails(withHints);
+        details.classList.remove("hidden");
+      }
+
       await openRemoteApp();
       return;
     }
