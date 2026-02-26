@@ -285,10 +285,10 @@ fn show_main_window(window: Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
+async fn get_about_info(state: State<'_, AppState>) -> Result<AboutInfo, String> {
     if let Some(config) = &state.config {
         let parity = check_web_build_parity(config).await;
-        return AboutInfo {
+        return Ok(AboutInfo {
             title: config.window_title.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             app_host: config
@@ -302,10 +302,10 @@ async fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
             web_build_hash: parity.web_build_hash,
             web_build_time: parity.web_build_time,
             web_build_error: parity.parity_error,
-        };
+        });
     }
 
-    AboutInfo {
+    Ok(AboutInfo {
         title: DEFAULT_TITLE.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         app_host: "not-configured".to_string(),
@@ -315,7 +315,7 @@ async fn get_about_info(state: State<'_, AppState>) -> AboutInfo {
         web_build_hash: None,
         web_build_time: None,
         web_build_error: None,
-    }
+    })
 }
 
 fn get_config(state: &AppState) -> Result<RuntimeConfig, String> {
