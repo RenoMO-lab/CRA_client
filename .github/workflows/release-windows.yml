@@ -2,6 +2,8 @@ name: release-windows
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -16,21 +18,61 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $plain = "$($pkg.version)".Trim()
+          if ([string]::IsNullOrWhiteSpace($plain)) {
+            throw "package.json version is empty"
+          }
+          if ($plain.StartsWith("v")) {
+            $plain = $plain.Substring(1)
+          }
+          $tag = "v$plain"
+          "version_plain=$plain" >> $env:GITHUB_OUTPUT
+          "version_tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Resolved version: $tag"
+
+      - name: Check existing release/tag
+        id: exists
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.version.outputs.version_tag }}';
+            const { owner, repo } = context.repo;
+            let exists = false;
+            try {
+              await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              exists = true;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            core.info(`Release check for ${tag}: ${exists ? 'exists' : 'missing'}`);
+            core.setOutput('release_exists', exists ? 'true' : 'false');
 
       - name: Setup Node
+        if: steps.exists.outputs.release_exists != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Setup Rust
+        if: steps.exists.outputs.release_exists != 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust Cache
+        if: steps.exists.outputs.release_exists != 'true'
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
       - name: Normalize package.json encoding
+        if: steps.exists.outputs.release_exists != 'true'
         shell: pwsh
         run: |
           $path = "package.json"
@@ -43,24 +85,34 @@ jobs:
           }
 
       - name: Install dependencies
+        if: steps.exists.outputs.release_exists != 'true'
         run: npm install
 
       - name: Build desktop app
+        if: steps.exists.outputs.release_exists != 'true'
         run: npm run tauri:build
 
       - name: Repackage deterministic artifact
+        if: steps.exists.outputs.release_exists != 'true'
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}"
-          if ($version.StartsWith("v")) {
-            $version = $version.Substring(1)
-          }
+          $version = "${{ steps.version.outputs.version_plain }}"
           .\scripts\package-windows.ps1 -Version $version
 
       - name: Publish release assets
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.exists.outputs.release_exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version_tag }}
+          name: CRA Client ${{ steps.version.outputs.version_tag }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
           files: |
             artifacts/CRA-Client-*-windows-x64.exe
             artifacts/CRA-Client-*-windows-x64.exe.sha256
+
+      - name: Skip duplicate release
+        if: steps.exists.outputs.release_exists == 'true'
+        shell: pwsh
+        run: |
+          Write-Host "Release ${{ steps.version.outputs.version_tag }} already exists. Skipping build/publish."

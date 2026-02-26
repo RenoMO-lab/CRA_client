@@ -169,9 +169,14 @@ Result:
 
 ## CI/CD
 
-Tag-based GitHub Actions workflow:
+GitHub Actions release workflow:
 - File: `.github/workflows/release-windows.yml`
-- Trigger: push tag `v*`
+- Triggers:
+  - push to `main` (auto-release based on `package.json` version)
+  - push tag `v*` (compatibility trigger)
+  - manual `workflow_dispatch`
+- Version source: `package.json` (`version` -> release tag `v<version>`)
+- Duplicate protection: if release tag already exists, workflow exits without rebuilding/publishing.
 - Produces release assets:
   - `CRA-Client-<version>-windows-x64.exe`
   - `CRA-Client-<version>-windows-x64.exe.sha256`
